@@ -4,6 +4,18 @@
 @{
     ViewData["Title"] = "Home page";
 }
+<br />
+@{
+    int total = Model.Questions?.Count ?? 0;
+    int answered = Model.Answers?.Count(a => !string.IsNullOrWhiteSpace(a)) ?? 0;
+    int percent = total > 0 ? (int)((double)answered / total * 100) : 0;
+}
+
+<div class="progress mb-4">
+    <div id="progressBar" class="progress-bar gradient-bar" role="progressbar" style="width: 0%;">
+        0 of @Model.Questions.Count answered
+    </div>
+</div>
 
 @if (Model.Questions?.Any() == true)
 {
@@ -24,16 +36,8 @@
             {
                 var question = Model.Questions[i];
 
-                <div class="mb-4 border rounded p-3 shadow-sm">
+                <div class="mb-4 border rounded p-3 shadow-sm question-box">
                     <h5>@(i + 1). @Html.Raw(question.Question)</h5>
-                    <p>
-                        <small style="color:gray;">
-                            Answers count: <strong>@question.AllAnswers?.Count</strong> |
-                            Distinct: <strong>@(question.AllAnswers?.Distinct().Count())</strong> |
-                            IsMultipleChoice: <strong>@(question.IsMultipleChoice)</strong>
-                        </small>
-                    </p>
-
                     @if (question.IsMultipleChoice)
                     {
                         @for (int j = 0; j < question.AllAnswers.Count; j++)
@@ -62,7 +66,7 @@
                     {
                         var isCorrect = string.Equals(Model.Answers[i]?.Trim(), question.Correct_Answer?.Trim(), StringComparison.OrdinalIgnoreCase);
                         <p class="mt-2 text-@(isCorrect ? "success" : "danger")">
-                            @(isCorrect ? "Correct!" : $"Wrong! Correct answer was: {question.Correct_Answer}")
+                            @(isCorrect ? "Correct!" : Html.Raw($"Wrong! Correct answer was: {question.Correct_Answer}"))
                         </p>
                     }
 
@@ -70,9 +74,9 @@
             }
         </div>
 
-        <div class="text-center mt-3">
-            <button type="submit" asp-page-handler="SubmitAnswers" class="btn btn-primary">Submit Answers</button>
-        </div>
+        <button type="submit" id="submitBtn" asp-page-handler="SubmitAnswers" class="btn btn-primary btn-lg" disabled>
+            Submit Answers
+        </button>
 
         @if (Model.Score != null)
         {
@@ -100,3 +104,35 @@ else
         <p>Loading questions...</p>
     </div>
 }
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const inputs = document.querySelectorAll("input[type='radio'], input[type='text']");
+            const progressBar = document.getElementById("progressBar");
+            const submitBtn = document.getElementById("submitBtn");
+
+            function updateProgressBar() {
+                const answered = [...inputs]
+                    .filter(input => (input.type === "radio" && input.checked) ||
+                                     (input.type === "text" && input.value.trim() !== ""))
+                    .map(input => input.name.match(/\d+/)?.[0])
+                    .filter((v, i, a) => v && a.indexOf(v) === i);
+
+                const total = @Model.Questions.Count;
+                const percent = Math.round((answered.length / total) * 100);
+                progressBar.style.width = percent + "%";
+                progressBar.innerText = `${answered.length} of ${total} answered`;
+
+                submitBtn.disabled = answered.length !== total;
+            }
+
+            inputs.forEach(input => {
+                input.addEventListener("input", updateProgressBar);
+            });
+
+            updateProgressBar();
+        });
+    </script>
+}
+
